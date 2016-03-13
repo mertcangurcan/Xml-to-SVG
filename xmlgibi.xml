@@ -5,10 +5,10 @@
 		<width>200</width>
 		<backcolor>AABBCC</backcolor>
 	</canvas>
-		<Xaxis>
+	<Xaxis>
 		<name>Sales (TL)</name>
 	</Xaxis>
-		<Yaxis>
+	<Yaxis>
 		<name>Months</name>
 		<forecolor>AABBCC</forecolor>
 	</Yaxis>

@@ -1,0 +1,56 @@
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+<xsd:annotation>
+	<xsd:documentation xml:lang="en"></xsd:documentation>
+</xsd:annotation>
+
+<xsd:element name="chartgendata" type="ChartGenDataType"/>
+<xsd:complexType name="ChartGenDataType">
+	<xsd:sequence>
+		<xsd:element name="charttitle" type="xsd:string"/>
+		<xsd:element name="canvas" type="Canvas"/>
+		<xsd:element name="Xaxis" type="Xaxis"/>
+		<xsd:element name="Yaxis" type="Yaxis"/>
+		<xsd:element name="Xset" type="Xset"/>
+		<xsd:element name="Yset" type="Yset" minOccurs="0" maxOccurs="150"/>
+	</xsd:sequence>
+</xsd:complexType>
+<xsd:complexType name="Canvas">
+	<xsd:sequence>
+		<xsd:element name="length" type="xsd:integer"/>
+		<xsd:element name="width" type="xsd:integer"/>	
+		<xsd:element name="backcolor" type="xsd:string"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="Xaxis">
+	<xsd:sequence>
+		<xsd:element name="name" type="xsd:string"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="Yaxis">
+	<xsd:sequence>
+		<xsd:element name="name" type="xsd:string"/>
+		<xsd:element name="forecolor" type="xsd:string"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="Xset">
+	<xsd:sequence>
+		<xsd:element name="xdata" type="xsd:string" minOccurs="0" maxOccurs="unbounded" />
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="Yset">
+	<xsd:sequence>
+		<xsd:element name="ydata" type="xsd:string" minOccurs="0" maxOccurs="unbounded" />
+	</xsd:sequence>
+
+	<xsd:attribute name="name" type="xsd:string" use="required"/>
+	<xsd:attribute name="unit" type="xsd:string" use="required"/>
+	<xsd:attribute name="showvalue" type="xsd:string" />
+	<xsd:attribute name="fillcolor" type="xsd:string" use="required"/>
+</xsd:complexType>
+
+</xsd:schema>

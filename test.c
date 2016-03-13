@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <math.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlschemastypes.h>
-#include <math.h>
 
+static void countData(xmlNode *firstNode);
+static void countYSets(xmlNode *firstNode);
 static void getValues(xmlNode *firstNode);
 static void printSpace(int times);
 static void printHelpMessage();
@@ -27,7 +30,7 @@ struct Axis{
 struct Set{
   char *unit, *name, *fillcolor;
   bool showValue;
-  char *values[];
+  char **values;
 };
 
 char *title;
@@ -45,6 +48,8 @@ int main(int argc, char *argv[]) {
   char * validationName = NULL;
   char * type = NULL;
   bool wantHelp = 0;
+  ysetCount = 0;
+  dataCount = 0;
 
   for(i=0; i<argc; i++){
     if(i+1!=argc && !strcmp(argv[i], "-i")){
@@ -100,6 +105,8 @@ int main(int argc, char *argv[]) {
     xmlSchemaCleanupTypes();
     return 0;
   }
+  countData(root->children);
+  countYSets(root->children);
 
   // todo: bunun içindeki valueleri kullanarak yeni svg üreticez
   getValues(root->children);
@@ -133,87 +140,128 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
+static void countData(xmlNode *firstNode){
+  xmlNode *curNode = NULL;
+  xmlNode *childNode = NULL;
+  for(curNode = firstNode; curNode; curNode = curNode->next){
+    if(curNode->type == XML_ELEMENT_NODE && (!strcmp(curNode->name, "Xset") || !strcmp(curNode->name, "Yset"))){
+      for(childNode = curNode->children; childNode; childNode = childNode->next){
+          if(childNode->type == XML_ELEMENT_NODE){
+            dataCount++;
+          }
+      }
+      return;
+    }
+  }
+}
+
+static void countYSets(xmlNode *firstNode){
+  xmlNode *curNode = NULL;
+  for(curNode = firstNode; curNode; curNode = curNode->next){
+    if(curNode->type == XML_ELEMENT_NODE && !strcmp(curNode->name, "Yset")){
+      ysetCount++;
+    }
+  }
+}
+
 static void getValues(xmlNode *firstNode){
   xmlNode * curNode = NULL;
   xmlNode * childNode = NULL;
   xmlAttr * childAttr = NULL;
+  int ysetIndex = 0;
 
   for(curNode = firstNode; curNode; curNode = curNode->next){
     if(curNode->type == XML_ELEMENT_NODE){
       if(!strcmp(curNode->name, "charttitle")){
+          title = (char*) malloc(sizeof(char)*100);
           title = curNode->children->content;
       }else if(!strcmp(curNode->name, "canvas")){
           for(childNode = curNode->children; childNode; childNode = childNode->next){
             if(!strcmp(childNode->name, "length")){
+                canvas.length = (char*) malloc(sizeof(char)*100);
                 canvas.length = childNode->children->content;
             }else if(!strcmp(childNode->name, "width")){
+                canvas.width = (char*) malloc(sizeof(char)*100);
                 canvas.width = childNode->children->content;
             }else if(!strcmp(childNode->name, "backcolor")){
+                canvas.backcolor = (char*) malloc(sizeof(char)*100);
                 canvas.backcolor = childNode->children->content;
             }
           }
       }else if(!strcmp(curNode->name, "Xaxis")){
         for(childNode = curNode->children; childNode; childNode = childNode->next){
           if(!strcmp(childNode->name, "name")){
+              xaxis.name = (char*) malloc(sizeof(char)*100);
               xaxis.name = childNode->children->content;
           }else if(!strcmp(childNode->name, "forecolor")){
+              xaxis.forecolor = (char*) malloc(sizeof(char)*100);
               xaxis.forecolor = childNode->children->content;
           }
         }
       }else if(!strcmp(curNode->name, "Yaxis")){
         for(childNode = curNode->children; childNode; childNode = childNode->next){
           if(!strcmp(childNode->name, "name")){
+              xaxis.name = (char*) malloc(sizeof(char)*100);
               yaxis.name = childNode->children->content;
           }else if(!strcmp(childNode->name, "forecolor")){
+              xaxis.forecolor = (char*) malloc(sizeof(char)*100);
               yaxis.forecolor = childNode->children->content;
           }
         }
       }else if(!strcmp(curNode->name, "Xset")){
-        if(dataCount == 0){
-          for(childNode = curNode->children; childNode; childNode = childNode->next){
-              if(childNode->type == XML_ELEMENT_NODE){
-                dataCount++;
-              }
-          }
+        xset.values = (char**) malloc((1+dataCount)*sizeof(char*));
+        int i;
+        for(i=0; i<dataCount; i++){
+          xset.values[i] = (char*) malloc(sizeof(char)*100);
         }
-        int valueCount = 0;
+        xset.unit = (char*) malloc(sizeof(char)*100);
+        xset.fillcolor = (char*) malloc(sizeof(char)*100);
+        xset.name = (char*) malloc(sizeof(char)*100);
+        xset.showValue = 1;
+
+        int valueIndex = 0;
         for(childNode = curNode->children; childNode; childNode = childNode->next){
           if(!strcmp(childNode->name, "xdata")){
-              xset.values[valueCount++] = childNode->children->content;
+            strcpy(xset.values[valueIndex], childNode->children->content);
+            valueIndex++;
           }
         }
       }else if(!strcmp(curNode->name, "Yset")){
-        if(dataCount == 0){
-          for(childNode = curNode->children; childNode; childNode = childNode->next){
-              if(childNode->type == XML_ELEMENT_NODE){
-                dataCount++;
-              }
-          }
+        ysets[ysetIndex].values = (char**) malloc((1+dataCount)*sizeof(char*));
+        int i;
+        for(i=0; i<dataCount; i++){
+          ysets[ysetIndex].values[i] = (char*) malloc(sizeof(char)*100);
         }
-        int valueCount = 0;
+        xset.unit = (char*) malloc(sizeof(char)*100);
+        xset.fillcolor = (char*) malloc(sizeof(char)*100);
+        xset.name = (char*) malloc(sizeof(char)*100);
+        xset.showValue = 1;
+
+        int valueIndex = 0;
         for(childNode = curNode->children; childNode; childNode = childNode->next){
           if(!strcmp(childNode->name, "ydata")){
-            ysets[ysetCount].values[valueCount++] = childNode->children->content;
+            strcpy(ysets[ysetIndex].values[valueIndex], childNode->children->content);
+            valueIndex++;
           }
         }
 
         for(childAttr = curNode->properties; childAttr; childAttr = childAttr->next){
           if(!strcmp(childAttr->name, "unit")){
-            ysets[ysetCount].unit = childAttr->children->content;
+            ysets[ysetIndex].unit = childAttr->children->content;
           }else if(!strcmp(childAttr->name, "fillcolor")){
-            ysets[ysetCount].fillcolor = childAttr->children->content;
+            ysets[ysetIndex].fillcolor = childAttr->children->content;
           }else if(!strcmp(childAttr->name, "name")){
-            ysets[ysetCount].name = childAttr->children->content;
+            ysets[ysetIndex].name = childAttr->children->content;
           }else if(!strcmp(childAttr->name, "fillcolor")){
             if(!strcmp(childAttr->children->content, "yes")){
-              ysets[ysetCount].showValue = 1;
+              ysets[ysetIndex].showValue = 1;
             }else{
-              ysets[ysetCount].showValue = 0;
+              ysets[ysetIndex].showValue = 0;
             }
           }
         }
 
-        ysetCount++;
+        ysetIndex++;
       }
     }
   }
@@ -371,38 +419,55 @@ static void CreateBarChart(xmlNode *root){
 }
 
 static void CreateLineChart(xmlNode *root){
-  xmlNodePtr newNode;
-  newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
-  xmlNewProp(newNode, BAD_CAST "x1", "20");
-  xmlNewProp(newNode, BAD_CAST "x2", "220");
-  xmlNewProp(newNode, BAD_CAST "y1", "200");
-  xmlNewProp(newNode, BAD_CAST "y2","200");
-  xmlNewProp(newNode, BAD_CAST "style","stroke:rgb(255,0,0);stroke-width:3");
-
-  newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
-  xmlNewProp(newNode, BAD_CAST "x1", "20");
-  xmlNewProp(newNode, BAD_CAST "x2", "20");
-  xmlNewProp(newNode, BAD_CAST "y1", "0");
-  xmlNewProp(newNode, BAD_CAST "y2","200");
-  xmlNewProp(newNode, BAD_CAST "style", "stroke:rgb(255,0,0);stroke-width:3");
-
-  xmlNewChild(root, NULL, BAD_CAST "polyline",NULL); // illa bi değişkene eşitlemek zorunda değilsin
-
+  xmlNodePtr newNode, lineNode;
   int i, j;
-  int range = 0;
-  char str[25];
-  for(i = 0, j = 0; j < ysetCount && i < dataCount; i++, j++){
-    newNode = xmlNewChild(root,NULL,BAD_CAST "line",NULL);
-    sprintf(str, "%d", range);
-    xmlNewProp(newNode, BAD_CAST "x1", BAD_CAST str);
-    sprintf(str,"%d",(atoi(canvas.width)-atoi(ysets[j].values[i])));
-    xmlNewProp(newNode, BAD_CAST "y1", BAD_CAST str);
-    sprintf(str, "%d", (range+100));
-    xmlNewProp(newNode, BAD_CAST "x2", BAD_CAST str);
+  char allPoints[255];
+  char point[25];
+  for(j = 0; j < 1; j++){ // ysetCount olarak değiştirilecek, ama üstüste yazar
+    newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
+    xmlNewProp(newNode, BAD_CAST "x1", BAD_CAST "20");
+    xmlNewProp(newNode, BAD_CAST "x2", BAD_CAST "220");
+    xmlNewProp(newNode, BAD_CAST "y1", BAD_CAST "200");
+    xmlNewProp(newNode, BAD_CAST "y2", BAD_CAST "200");
+    xmlNewProp(newNode, BAD_CAST "style", BAD_CAST "stroke:rgb(255,0,0);stroke-width:3");
 
-    if(i != ((sizeof(ysets[j].values[0])/sizeof(int))-1)){
-      sprintf(str,"%d",atoi(canvas.width)-atoi(ysets[j].values[i+1]));
-      xmlNewProp(newNode, BAD_CAST "y2", BAD_CAST str);
+    newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
+    xmlNewProp(newNode, BAD_CAST "x1", BAD_CAST "20");
+    xmlNewProp(newNode, BAD_CAST "x2", BAD_CAST "20");
+    xmlNewProp(newNode, BAD_CAST "y1", BAD_CAST "0");
+    xmlNewProp(newNode, BAD_CAST "y2", BAD_CAST "200");
+    xmlNewProp(newNode, BAD_CAST "style", BAD_CAST "stroke:rgb(255,0,0);stroke-width:3");
+
+    newNode = xmlNewChild(root, NULL, BAD_CAST "polyline",NULL);
+    int maxValue = 0;
+    for(i = 0; i < dataCount; i++){
+      int value = atoi(ysets[j].values[i]);
+      if(value > maxValue){
+        maxValue = value;
+      }
     }
+    int coordinates[dataCount*2+4];
+    coordinates[0] = 20;
+    coordinates[1] = 200;
+    double d;
+    int x,y;
+    for(i = 1; i <= dataCount; i++){
+      int value = atoi(ysets[j].values[i-1]);
+      d = (float) 170/dataCount;
+      x = 20 + (int) ((float)i*d);
+      coordinates[2*i] = x;
+      d = (float) 200/maxValue;
+      y = 200 - (int) ((float)value*d);
+      coordinates[2*i+1] = y;
+    }
+    sprintf(allPoints, "");
+    xmlNewProp(newNode, BAD_CAST "style", BAD_CAST "stroke:rgb(255,0,0);stroke-width:3");
+    for(i = 0; i <= dataCount; i++){
+      sprintf(point, "%d,", coordinates[2*i]);
+      strcat(allPoints, point);
+      sprintf(point, "%d ", coordinates[2*i+1]);
+      strcat(allPoints, point);
+    }
+    xmlNewProp(newNode, BAD_CAST "points", BAD_CAST allPoints);
   }
 }
