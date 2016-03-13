@@ -3,21 +3,19 @@
 #include <stdbool.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
-#include <stdlib.h>
+#include <libxml/xmlschemastypes.h>
+#include <math.h>
 
-
-// böyle bir fonksiyonun dosya içerisinde varolduğu önceden belirtiliyo
-static void getValues(xmlNode * firstNode);
-int ysetCount = 0;
+static void getValues(xmlNode *firstNode);
 static void printSpace(int times);
 static void printHelpMessage();
-static void createLineChart();
-static void createBarChart();
-static void createDynamicLineChart(xmlNode *root_node);
-// argc (Argument Count) kaç tane argument olduğunu tutar
-// argv (Argument Values) argumentleri string yani char arrayi olarak tutar, char arrayinin(string) arrayi oluyo *argv[]
-// mesela çalıştırırken ./chartgen -i asd -a mahmut girdi
-// argc = 5 olur, argv ise {"./chartgen", "-i", "asd", "-a", "mahmut"} şeklinde array halinde
+static void CreatePieChart(xmlNode *root);
+static void pathD(xmlNode *root, int a, int b);
+static void CreateBarChart(xmlNode *root);
+static void CreateLineChart(xmlNode *root);
+
+#define PI 3.14159265359
+
 struct Canvas{
   char *length, *width, *backcolor;
 };
@@ -38,18 +36,16 @@ struct Axis xaxis;
 struct Axis yaxis;
 struct Set xset;
 struct Set ysets[10];
-
+int ysetCount, dataCount;
 
 int main(int argc, char *argv[]) {
   int i;
-  char * fileName;
-  char * outputName;
-  char * validationName;
-  char * type;
-  bool wantHelp = 0; // yardım istiyorsa bu işaretlenecek
-  
+  char * fileName = NULL;
+  char * outputName = NULL;
+  char * validationName = NULL;
+  char * type = NULL;
+  bool wantHelp = 0;
 
-  // argumentleri dolaşarak belirli komutlarımızı arayacak, mesela -i varsa sonraki argumenti inputFile olarak belirleyecek
   for(i=0; i<argc; i++){
     if(i+1!=argc && !strcmp(argv[i], "-i")){
       fileName = argv[i+1];
@@ -64,166 +60,83 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
-  // yardım istediyse mesajı gösterip return yapıcaz, programa devam etmeye gerek yok
   if(wantHelp){
     printHelpMessage();
     return 0;
   }
-
-  if(!(!strcmp(type, "line") || !strcmp(type, "pie") || !strcmp(type, "bar"))){
-    printf("Main Message: Invalid type. \n\n");
+  if(fileName == NULL){
+    printf("Main Message: There is no input file. \n\n");
+    printHelpMessage();
+    return 0;
+  }else if(validationName == NULL){
+    printf("Main Message: There is no validation file. \n\n");
+    printHelpMessage();
+    return 0;
+  }else if(!(!strcmp(type, "line") || !strcmp(type, "pie") || !strcmp(type, "bar"))){
+    printf("Main Message: Invalid typbuffer. \n\n");
     printHelpMessage();
     return 0;
   }
-  else if (!strcmp(type, "line"))
-  {
-    createLineChart(outputName);
-  }
-  else if (!strcmp(type, "bar"))
-  {
-    createBarChart(outputName);
-  }
+
   xmlDoc *doc = xmlReadFile(fileName, NULL, 0);
   if(doc == NULL){
     printf("Main Message: Document not found. \n\n");
     printHelpMessage();
-    xmlCleanupParser();
-    xmlFreeDoc(doc);
     return 0;
   }
   xmlNode *root = xmlDocGetRootElement(doc);
-  
+
+  xmlLineNumbersDefault(1);
+  xmlSchemaParserCtxtPtr context = xmlSchemaNewParserCtxt(validationName);
+  xmlSchemaPtr schema = xmlSchemaParse(context);
+  xmlSchemaValidCtxtPtr validContext = xmlSchemaNewValidCtxt(schema);
+  int validRes = xmlSchemaValidateDoc(validContext, doc);
+  if(validRes != 0){
+    printf("Main Message: XML error. \n\n");
+    printHelpMessage();
+    xmlCleanupParser();
+    xmlFreeDoc(doc);
+    xmlSchemaFree(schema);
+    xmlSchemaCleanupTypes();
+    return 0;
+  }
 
   // todo: bunun içindeki valueleri kullanarak yeni svg üreticez
   getValues(root->children);
 
   // todo: creating svg file
-  xmlDocPtr newDoc  = NULL;
-  xmlNodePtr newRoot = NULL;
-  
+  xmlDocPtr newDoc  = xmlNewDoc(BAD_CAST "1.0");
+  xmlNodePtr newRoot = xmlNewNode(NULL, BAD_CAST "svg");
+  xmlNewProp(newRoot, BAD_CAST "width", BAD_CAST "500");
+  xmlNewProp(newRoot, BAD_CAST "height", BAD_CAST "500");
+  xmlNewProp(newRoot, BAD_CAST "xmlns", BAD_CAST "http://www.w3.org/2000/svg");
+  xmlNewProp(newRoot, BAD_CAST "style", BAD_CAST "background-color: blue;");
+  xmlDocSetRootElement(newDoc, newRoot);
 
-  
+  if(!strcmp(type, "pie")){
+    CreatePieChart(newRoot);
+      pathD(newRoot, 90, 150);
+        pathD(newRoot, 70, 90);
+  }else if(!strcmp(type, "bar")){
+    CreateBarChart(newRoot);
+  }else if(!strcmp(type, "line")){
+    CreateLineChart(newRoot);
+  }
+
+  htmlSaveFileEnc(outputName, newDoc, "UTF­8", 1);
+
   xmlCleanupParser();
   xmlFreeDoc(doc);
+  xmlMemoryDump();
+  xmlSchemaFree(schema);
+  xmlSchemaCleanupTypes();
   return 0;
 }
-static void createBarChart(char * outputName){
- xmlDocPtr doc = NULL;
 
-    xmlNodePtr rootNode = NULL,node=NULL;
-
-    doc = xmlNewDoc(BAD_CAST"1.0");
-    rootNode = xmlNewNode(NULL,BAD_CAST"svg");
-
-    xmlDocSetRootElement(doc,rootNode);
-    xmlNewProp(rootNode,BAD_CAST"height",BAD_CAST"200");
-    xmlNewProp(rootNode,BAD_CAST"width",BAD_CAST"200");
-    int i;
-
-    for(i=1; i<3; i++){
-
-        node=xmlNewChild(rootNode,NULL,BAD_CAST "rect",NULL);
-        xmlNewProp(node,BAD_CAST "x",BAD_CAST((i%2) ? "0" : "16"));
-        xmlNewProp(node,BAD_CAST "y",BAD_CAST((i%2) ? "167" : "134"));
-        xmlNewProp(node,BAD_CAST "width",BAD_CAST "16");
-        xmlNewProp(node,BAD_CAST "height",BAD_CAST((i%2) ? "33" : "66"));
-        xmlNewProp(node,BAD_CAST "style",BAD_CAST "fill:blue");
-    }
-
-    int j;
-
-    for(j=1; j<3; j++){
-        node=xmlNewChild(rootNode,NULL,BAD_CAST "rect",NULL);
-        xmlNewProp(node,BAD_CAST "x",BAD_CAST((j%2) ? "32" : "48"));
-        xmlNewProp(node,BAD_CAST "y",BAD_CAST((j%2) ? "2" : "68"));
-        xmlNewProp(node,BAD_CAST "width",BAD_CAST "16");
-        xmlNewProp(node,BAD_CAST "height",BAD_CAST((j%2) ? "198" : "132"));
-        xmlNewProp(node,BAD_CAST "style",BAD_CAST "fill:blue");
-    }
-
-    int k;
-
-    for(k=1; k<3; k++){
-
-        node=xmlNewChild(rootNode,NULL,BAD_CAST "rect",NULL);
-        xmlNewProp(node,BAD_CAST "x",BAD_CAST((k%2) ? "64" : "80"));
-        xmlNewProp(node,BAD_CAST "y",BAD_CAST((k%2) ? "35" : "101"));
-        xmlNewProp(node,BAD_CAST "width",BAD_CAST "16");
-        xmlNewProp(node,BAD_CAST "height",BAD_CAST((k%2) ? "165" : "99"));
-        xmlNewProp(node,BAD_CAST "style",BAD_CAST "fill:blue");
-    }
-        htmlSaveFileEnc(outputName, doc, "UTF-8", 1);
-}
-static void createDynamicLineChart(xmlNode *root_node)///
-{
-xmlNodePtr keepnode = NULL;
-int i;
-int j =0;
-int range = 0;
-  while(ysetCount <= j){
-  for(i = 0; i< (sizeof(ysets[j].values[0])/sizeof(int)); i++){
-    keepnode = xmlNewChild(root_node,NULL,BAD_CAST "line",NULL);
-    xmlNewProp(keepnode,BAD_CAST "x1",range);
-    
-
-    char *str[25];
-    sprintf(str,"%d",(atoi(canvas.width)-atoi(ysets[j].values[i])));
-    xmlNewProp(keepnode,BAD_CAST "y1",str);
-    xmlNewProp(keepnode,BAD_CAST "x2",(range+100));
-    
-
-    
-    if(i != ((sizeof(ysets[j].values[0])/sizeof(int))-1)){
-    sprintf(str,"%d",atoi(canvas.width)-atoi(ysets[j].values[i+1]));
-    xmlNewProp(keepnode,BAD_CAST "y2",str);
-      }
-    }
-    j++;
-  }
-}
-static void createLineChart(char * outputName){ 
-
-  xmlDocPtr doc = NULL;       /* document pointer */
-  xmlNodePtr root_node = NULL, node = NULL, node1 = NULL, node2 = NULL;/* node pointers */
-  xmlDtdPtr dtd = NULL;       /* DTD pointer */
-
-  doc = xmlNewDoc(BAD_CAST "2.0");
-  root_node = xmlNewNode(NULL,BAD_CAST "svg");
-  xmlNewProp(root_node, BAD_CAST "xmlns", "http://www.w3.org/2000/svg");
-  xmlNewProp(root_node, BAD_CAST "width", BAD_CAST canvas.width);
-  xmlNewProp(root_node, BAD_CAST "height", BAD_CAST canvas.length);
-  xmlDocSetRootElement(doc, root_node);
-
-  node = xmlNewChild(root_node, NULL, BAD_CAST "line",NULL);
-  node1 = xmlNewChild(root_node, NULL, BAD_CAST "line",NULL);
-  node2 = xmlNewChild(root_node, NULL, BAD_CAST "polyline",NULL);
-  
-  
-  
-  xmlNewProp(node1, BAD_CAST "x1", "20");
-  xmlNewProp(node1, BAD_CAST "x2", "20");
-  xmlNewProp(node1, BAD_CAST "y1", "0");
-  xmlNewProp(node1, BAD_CAST "y2","200");
-  xmlNewProp(node1, BAD_CAST "style", "stroke:rgb(255,0,0);stroke-width:3");
-
-  xmlNewProp(node, BAD_CAST "x1", "20");
-  xmlNewProp(node, BAD_CAST "x2", "220");
-  xmlNewProp(node, BAD_CAST "y1", "200");
-  xmlNewProp(node, BAD_CAST "y2","200");
-  xmlNewProp(node, BAD_CAST "style","stroke:rgb(255,0,0);stroke-width:3");
-  createDynamicLineChart(root_node);
-
-  htmlSaveFileEnc(outputName, doc, "UTF-8", 1);
-  xmlFreeDoc(doc);
-  xmlCleanupParser();
-  xmlMemoryDump();
-  }
-static void getValues(xmlNode * firstNode){
+static void getValues(xmlNode *firstNode){
   xmlNode * curNode = NULL;
   xmlNode * childNode = NULL;
   xmlAttr * childAttr = NULL;
-  int dataCount = 0;
-  
 
   for(curNode = firstNode; curNode; curNode = curNode->next){
     if(curNode->type == XML_ELEMENT_NODE){
@@ -269,10 +182,6 @@ static void getValues(xmlNode * firstNode){
               xset.values[valueCount++] = childNode->children->content;
           }
         }
-        // CANT ITERATE ATTRIBUTES
-        for(childAttr = curNode->children->properties; childAttr; childAttr = childAttr->next){
-          printf("%s\n", childAttr->name);
-        }
       }else if(!strcmp(curNode->name, "Yset")){
         if(dataCount == 0){
           for(childNode = curNode->children; childNode; childNode = childNode->next){
@@ -285,6 +194,22 @@ static void getValues(xmlNode * firstNode){
         for(childNode = curNode->children; childNode; childNode = childNode->next){
           if(!strcmp(childNode->name, "ydata")){
             ysets[ysetCount].values[valueCount++] = childNode->children->content;
+          }
+        }
+
+        for(childAttr = curNode->properties; childAttr; childAttr = childAttr->next){
+          if(!strcmp(childAttr->name, "unit")){
+            ysets[ysetCount].unit = childAttr->children->content;
+          }else if(!strcmp(childAttr->name, "fillcolor")){
+            ysets[ysetCount].fillcolor = childAttr->children->content;
+          }else if(!strcmp(childAttr->name, "name")){
+            ysets[ysetCount].name = childAttr->children->content;
+          }else if(!strcmp(childAttr->name, "fillcolor")){
+            if(!strcmp(childAttr->children->content, "yes")){
+              ysets[ysetCount].showValue = 1;
+            }else{
+              ysets[ysetCount].showValue = 0;
+            }
           }
         }
 
@@ -319,7 +244,7 @@ static void printHelpMessage(){
   printSpace(5);
   printf("         -i");
   printSpace(5);
-  printf("Input file name which in XML format.\n"); 
+  printf("Input file name which in XML format.\n");
   printSpace(5);
   printf("         -o");
   printSpace(5);
@@ -336,4 +261,148 @@ static void printHelpMessage(){
   printf("         -h");
   printSpace(5);
   printf("Writing help message.\n");
+}
+
+static void pathD(xmlNode *newRoot, int a, int b){
+  int x1 = 200 + 180*cos(PI*a/180);
+  int y1 = 200 + 180*sin(PI*a/180);
+
+  int x2 = 200 + 180*cos(PI*b/180);
+  int y2 = 200 + 180*sin(PI*b/180);
+
+  char number[36];
+  char path[255];
+  strcpy(path, "M200,200  L");
+  sprintf(number, "%d", x1);
+  strcat(path, number);
+  strcat(path, ",");
+  sprintf(number, "%d", y1);
+  strcat(path, number);
+  strcat(path, "  A180,180 0 0,1 ");
+  sprintf(number, "%d", x2);
+  strcat(path, number);
+  strcat(path, ",");
+  sprintf(number, "%d", y2);
+  strcat(path, number);
+  strcat(path, " z");
+
+  printf("%s\n", path);
+
+    xmlNodePtr newNode;
+  newNode = xmlNewChild(newRoot, NULL, BAD_CAST "path", NULL);
+  xmlNewProp(newNode, BAD_CAST "d", BAD_CAST path);
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+}
+
+static void CreatePieChart(xmlNode *root){
+  xmlNodePtr newNode;
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST title);
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "10");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "30");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "circle", NULL);
+  xmlNewProp(newNode, BAD_CAST "cx", BAD_CAST "50");
+  xmlNewProp(newNode, BAD_CAST "cy", BAD_CAST "90");
+  xmlNewProp(newNode, BAD_CAST "r", BAD_CAST "30");
+  xmlNewProp(newNode, BAD_CAST "stroke", BAD_CAST "black");
+  xmlNewProp(newNode, BAD_CAST "stroke-width", BAD_CAST "1");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST xset.name);
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "50");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "70");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "white");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "rect", NULL);
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "100");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "80");
+  xmlNewProp(newNode, BAD_CAST "width", BAD_CAST "20");
+  xmlNewProp(newNode, BAD_CAST "height", BAD_CAST "20");
+  xmlNewProp(newNode, BAD_CAST "stroke", BAD_CAST "black");
+  xmlNewProp(newNode, BAD_CAST "stroke-width", BAD_CAST "1");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "Name #1");
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "130");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "95");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "City #1");
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "30");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "140");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "white");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "#1");
+  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "40");
+  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "95");
+  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "blue");
+  xmlNewProp(newNode, BAD_CAST "transform", BAD_CAST "rotate(0)");
+}
+
+static void CreateBarChart(xmlNode *root){
+    xmlNodePtr newNode;
+    int i;
+    for(i=1; i<3; i++){
+        newNode=xmlNewChild(root,NULL,BAD_CAST "rect",NULL);
+        xmlNewProp(newNode,BAD_CAST "x",BAD_CAST((i%2) ? "0" : "16"));
+        xmlNewProp(newNode,BAD_CAST "y",BAD_CAST((i%2) ? "167" : "134"));
+        xmlNewProp(newNode,BAD_CAST "width",BAD_CAST "16");
+        xmlNewProp(newNode,BAD_CAST "height",BAD_CAST((i%2) ? "33" : "66"));
+        xmlNewProp(newNode,BAD_CAST "style",BAD_CAST "fill:blue");
+    }
+    for(i=1; i<3; i++){
+        newNode=xmlNewChild(root,NULL,BAD_CAST "rect",NULL);
+        xmlNewProp(newNode,BAD_CAST "x",BAD_CAST((i%2) ? "32" : "48"));
+        xmlNewProp(newNode,BAD_CAST "y",BAD_CAST((i%2) ? "2" : "68"));
+        xmlNewProp(newNode,BAD_CAST "width",BAD_CAST "16");
+        xmlNewProp(newNode,BAD_CAST "height",BAD_CAST((i%2) ? "198" : "132"));
+        xmlNewProp(newNode,BAD_CAST "style",BAD_CAST "fill:blue");
+    }
+    for(i=1; i<3; i++){
+        newNode=xmlNewChild(root,NULL,BAD_CAST "rect",NULL);
+        xmlNewProp(newNode,BAD_CAST "x",BAD_CAST((i%2) ? "64" : "80"));
+        xmlNewProp(newNode,BAD_CAST "y",BAD_CAST((i%2) ? "35" : "101"));
+        xmlNewProp(newNode,BAD_CAST "width",BAD_CAST "16");
+        xmlNewProp(newNode,BAD_CAST "height",BAD_CAST((i%2) ? "165" : "99"));
+        xmlNewProp(newNode,BAD_CAST "style",BAD_CAST "fill:blue");
+    }
+}
+
+static void CreateLineChart(xmlNode *root){
+  xmlNodePtr newNode;
+  newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
+  xmlNewProp(newNode, BAD_CAST "x1", "20");
+  xmlNewProp(newNode, BAD_CAST "x2", "220");
+  xmlNewProp(newNode, BAD_CAST "y1", "200");
+  xmlNewProp(newNode, BAD_CAST "y2","200");
+  xmlNewProp(newNode, BAD_CAST "style","stroke:rgb(255,0,0);stroke-width:3");
+
+  newNode = xmlNewChild(root, NULL, BAD_CAST "line",NULL);
+  xmlNewProp(newNode, BAD_CAST "x1", "20");
+  xmlNewProp(newNode, BAD_CAST "x2", "20");
+  xmlNewProp(newNode, BAD_CAST "y1", "0");
+  xmlNewProp(newNode, BAD_CAST "y2","200");
+  xmlNewProp(newNode, BAD_CAST "style", "stroke:rgb(255,0,0);stroke-width:3");
+
+  xmlNewChild(root, NULL, BAD_CAST "polyline",NULL); // illa bi değişkene eşitlemek zorunda değilsin
+
+  int i, j;
+  int range = 0;
+  char str[25];
+  for(i = 0, j = 0; j < ysetCount && i < dataCount; i++, j++){
+    newNode = xmlNewChild(root,NULL,BAD_CAST "line",NULL);
+    sprintf(str, "%d", range);
+    xmlNewProp(newNode, BAD_CAST "x1", BAD_CAST str);
+    sprintf(str,"%d",(atoi(canvas.width)-atoi(ysets[j].values[i])));
+    xmlNewProp(newNode, BAD_CAST "y1", BAD_CAST str);
+    sprintf(str, "%d", (range+100));
+    xmlNewProp(newNode, BAD_CAST "x2", BAD_CAST str);
+
+    if(i != ((sizeof(ysets[j].values[0])/sizeof(int))-1)){
+      sprintf(str,"%d",atoi(canvas.width)-atoi(ysets[j].values[i+1]));
+      xmlNewProp(newNode, BAD_CAST "y2", BAD_CAST str);
+    }
+  }
 }
