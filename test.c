@@ -13,7 +13,6 @@ static void getValues(xmlNode *firstNode);
 static void printSpace(int times);
 static void printHelpMessage();
 static void CreatePieChart(xmlNode *root);
-static void pathD(xmlNode *root, int a, int b);
 static void CreateBarChart(xmlNode *root);
 static void CreateLineChart(xmlNode *root);
 
@@ -40,6 +39,9 @@ struct Axis yaxis;
 struct Set xset;
 struct Set ysets[10];
 int ysetCount, dataCount;
+char *colors[] = {"#E87162", "#5F5E5D", "#F2EEEA", "#B4B2AE", "#E24A37", "#231F20",
+          "#F15E00", "#FDFF3A", "#F19C28", "#A12E33"};
+char buffer[50];
 
 int main(int argc, char *argv[]) {
   int i;
@@ -108,29 +110,29 @@ int main(int argc, char *argv[]) {
   countData(root->children);
   countYSets(root->children);
 
-  // todo: bunun içindeki valueleri kullanarak yeni svg üreticez
   getValues(root->children);
 
-  // todo: creating svg file
   xmlDocPtr newDoc  = xmlNewDoc(BAD_CAST "1.0");
   xmlNodePtr newRoot = xmlNewNode(NULL, BAD_CAST "svg");
-  xmlNewProp(newRoot, BAD_CAST "width", BAD_CAST "500");
-  xmlNewProp(newRoot, BAD_CAST "height", BAD_CAST "500");
+  sprintf(buffer, "%d", atoi(canvas.width)+100);
+  xmlNewProp(newRoot, BAD_CAST "width", BAD_CAST buffer);
+  sprintf(buffer, "%d", atoi(canvas.length)*ysetCount);
+  xmlNewProp(newRoot, BAD_CAST "height", BAD_CAST buffer);
   xmlNewProp(newRoot, BAD_CAST "xmlns", BAD_CAST "http://www.w3.org/2000/svg");
-  xmlNewProp(newRoot, BAD_CAST "style", BAD_CAST "background-color: blue;");
+  //HEX CHECK?
+  sprintf(buffer, "background-color: #%s", canvas.backcolor);
+  xmlNewProp(newRoot, BAD_CAST "style", BAD_CAST buffer);
   xmlDocSetRootElement(newDoc, newRoot);
 
   if(!strcmp(type, "pie")){
     CreatePieChart(newRoot);
-      pathD(newRoot, 90, 150);
-        pathD(newRoot, 70, 90);
   }else if(!strcmp(type, "bar")){
     CreateBarChart(newRoot);
   }else if(!strcmp(type, "line")){
     CreateLineChart(newRoot);
   }
 
-  htmlSaveFileEnc(outputName, newDoc, "UTF­8", 1);
+  htmlSaveFileEnc(outputName, newDoc, "UTF-­8", 1);
 
   xmlCleanupParser();
   xmlFreeDoc(doc);
@@ -252,7 +254,7 @@ static void getValues(xmlNode *firstNode){
             ysets[ysetIndex].fillcolor = childAttr->children->content;
           }else if(!strcmp(childAttr->name, "name")){
             ysets[ysetIndex].name = childAttr->children->content;
-          }else if(!strcmp(childAttr->name, "fillcolor")){
+          }else if(!strcmp(childAttr->name, "showvalue")){
             if(!strcmp(childAttr->children->content, "yes")){
               ysets[ysetIndex].showValue = 1;
             }else{
@@ -311,37 +313,6 @@ static void printHelpMessage(){
   printf("Writing help message.\n");
 }
 
-static void pathD(xmlNode *newRoot, int a, int b){
-  int x1 = 200 + 180*cos(PI*a/180);
-  int y1 = 200 + 180*sin(PI*a/180);
-
-  int x2 = 200 + 180*cos(PI*b/180);
-  int y2 = 200 + 180*sin(PI*b/180);
-
-  char number[36];
-  char path[255];
-  strcpy(path, "M200,200  L");
-  sprintf(number, "%d", x1);
-  strcat(path, number);
-  strcat(path, ",");
-  sprintf(number, "%d", y1);
-  strcat(path, number);
-  strcat(path, "  A180,180 0 0,1 ");
-  sprintf(number, "%d", x2);
-  strcat(path, number);
-  strcat(path, ",");
-  sprintf(number, "%d", y2);
-  strcat(path, number);
-  strcat(path, " z");
-
-  printf("%s\n", path);
-
-    xmlNodePtr newNode;
-  newNode = xmlNewChild(newRoot, NULL, BAD_CAST "path", NULL);
-  xmlNewProp(newNode, BAD_CAST "d", BAD_CAST path);
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
-}
-
 static void CreatePieChart(xmlNode *root){
   xmlNodePtr newNode;
 
@@ -349,44 +320,78 @@ static void CreatePieChart(xmlNode *root){
   xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "10");
   xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "30");
   xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+  int i, j;
+  char number[36];
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "circle", NULL);
-  xmlNewProp(newNode, BAD_CAST "cx", BAD_CAST "50");
-  xmlNewProp(newNode, BAD_CAST "cy", BAD_CAST "90");
-  xmlNewProp(newNode, BAD_CAST "r", BAD_CAST "30");
-  xmlNewProp(newNode, BAD_CAST "stroke", BAD_CAST "black");
-  xmlNewProp(newNode, BAD_CAST "stroke-width", BAD_CAST "1");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+  // MATH
+  for(i=0; i<ysetCount; i++){
+    char **strValues = ysets[i].values;
+    int intValues[dataCount];
+    int sum = 0;
+    for(j=0; j<dataCount; j++){
+      intValues[j] = atoi(strValues[j]);
+      sum += intValues[j];
+    }
+    int pieValues[dataCount+1];
+    pieValues[0] = 0;
+    for(j=1; j<=dataCount; j++){
+      pieValues[j] = 360*intValues[j-1]/sum;
+    }
+    for(j=1; j<=dataCount; j++){
+      pieValues[j] += pieValues[j-1];
+    }
+    pieValues[dataCount] = 360;
+    bool showValues = ysets[i].showValue;
+    for(j=1; j<=dataCount; j++){
+      if(showValues){
+        newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST ysets[i].values[j-1]);
+        xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "100");
+        sprintf(number, "%d", 45+j*20+150*i);
+        xmlNewProp(newNode, BAD_CAST "y", BAD_CAST number);
+        xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "black");
+      }
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST xset.name);
-  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "50");
-  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "70");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "white");
+      newNode = xmlNewChild(root, NULL, BAD_CAST "rect", NULL);
+      xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "150");
+      sprintf(number, "%d", 30+j*20+150*i);
+      xmlNewProp(newNode, BAD_CAST "y", BAD_CAST number);
+      xmlNewProp(newNode, BAD_CAST "width", BAD_CAST "20");
+      xmlNewProp(newNode, BAD_CAST "height", BAD_CAST "20");
+      xmlNewProp(newNode, BAD_CAST "stroke", BAD_CAST "black");
+      xmlNewProp(newNode, BAD_CAST "stroke-width", BAD_CAST "1");
+      xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST colors[j-1]);
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "rect", NULL);
-  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "100");
-  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "80");
-  xmlNewProp(newNode, BAD_CAST "width", BAD_CAST "20");
-  xmlNewProp(newNode, BAD_CAST "height", BAD_CAST "20");
-  xmlNewProp(newNode, BAD_CAST "stroke", BAD_CAST "black");
-  xmlNewProp(newNode, BAD_CAST "stroke-width", BAD_CAST "1");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+      //sprintf(number, "%dto%d-%s", pieValues[j-1], pieValues[j], xset.values[j-1]);
+      newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST xset.values[j-1]);
+      xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "180");
+      sprintf(number, "%d", 45+j*20+150*i);
+      xmlNewProp(newNode, BAD_CAST "y", BAD_CAST number);
+      xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "Name #1");
-  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "130");
-  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "95");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "red");
+      int a = pieValues[j-1];
+      int b = pieValues[j];
+      int mx = 50;
+      int my = 100 + i*150;
+      int x1 = mx + 30*cos(PI*a/180);
+      int y1 = my + 30*sin(PI*a/180);
+      int x2 = mx + 30*cos(PI*b/180);
+      int y2 = my + 30*sin(PI*b/180);
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "City #1");
-  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "30");
-  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "140");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "white");
+      char path[255];
+      sprintf(path, "M%d,%d  L%d, %d A30,30 0 0,1 %d,%d z", mx, my, x1, y1, x2, y2);
 
-  newNode = xmlNewChild(root, NULL, BAD_CAST "text", BAD_CAST "#1");
-  xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "40");
-  xmlNewProp(newNode, BAD_CAST "y", BAD_CAST "95");
-  xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "blue");
-  xmlNewProp(newNode, BAD_CAST "transform", BAD_CAST "rotate(0)");
+      xmlNodePtr newNode;
+      newNode = xmlNewChild(root, NULL, BAD_CAST "path", NULL);
+      xmlNewProp(newNode, BAD_CAST "d", BAD_CAST path);
+      xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST colors[j-1]);
+
+      newNode = xmlNewChild(root, NULL, BAD_CAST "text", ysets[i].name);
+      sprintf(number, "%d", 150+i*150);
+      xmlNewProp(newNode, BAD_CAST "x", BAD_CAST "20");
+      xmlNewProp(newNode, BAD_CAST "y", BAD_CAST number);
+      xmlNewProp(newNode, BAD_CAST "fill", BAD_CAST "white");
+    }
+  }
 }
 
 static void CreateBarChart(xmlNode *root){

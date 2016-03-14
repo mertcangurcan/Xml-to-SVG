@@ -36,4 +36,12 @@
 		<ydata>5600</ydata>
 		<ydata>4200</ydata>
 	</Yset>
+	<Yset unit="TL" name="Edro" fillcolor="00CCDD">
+		<ydata>30</ydata>
+		<ydata>30</ydata>
+		<ydata>60</ydata>
+		<ydata>30</ydata>
+		<ydata>100</ydata>
+		<ydata>110</ydata>
+	</Yset>
 </chartgendata>
