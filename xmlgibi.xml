@@ -19,14 +19,16 @@
 		<xdata>April</xdata>
 		<xdata>May</xdata>
 		<xdata>June</xdata>
+		<xdata>July</xdata>
 	</Xset>
-	<Yset unit="TL" name="İzmir" showvalue="yes" fillcolor="FFCCDD">
+	<Yset unit="TL" name="İzmir" showvalue="yes" fillcolor="FF0000">
 		<ydata>1200</ydata>
 		<ydata>1500</ydata>
 		<ydata>7500</ydata>
 		<ydata>4200</ydata>
 		<ydata>5600</ydata>
 		<ydata>2200</ydata>
+		<ydata>5200</ydata>
 	</Yset>
 	<Yset unit="TL" name="İstanbul" fillcolor="00CCDD">
 		<ydata>9500</ydata>
@@ -35,13 +37,15 @@
 		<ydata>3200</ydata>
 		<ydata>5600</ydata>
 		<ydata>4200</ydata>
+		<ydata>9200</ydata>
 	</Yset>
-	<Yset unit="TL" name="Edro" fillcolor="00CCDD">
-		<ydata>30</ydata>
-		<ydata>30</ydata>
-		<ydata>60</ydata>
-		<ydata>30</ydata>
-		<ydata>100</ydata>
-		<ydata>110</ydata>
+	<Yset unit="TL" name="Edro" fillcolor="00DDCC">
+		<ydata>3000</ydata>
+		<ydata>3000</ydata>
+		<ydata>6000</ydata>
+		<ydata>3000</ydata>
+		<ydata>10000</ydata>
+		<ydata>7000</ydata>
+		<ydata>4000</ydata>
 	</Yset>
 </chartgendata>
